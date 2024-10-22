@@ -313,8 +313,7 @@ def main():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
 
-        if pg.sprite.groupcollide(shields, bombs, False, True).keys():
-            pass
+        pg.sprite.groupcollide(shields, bombs, False, True)
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
             bird.change_img(8, screen) # こうかとん悲しみエフェクト
