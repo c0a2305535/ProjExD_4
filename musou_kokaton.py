@@ -355,6 +355,36 @@ class Gravity(pg.sprite.Sprite):
             exps.add(Explosion(enemy, 50))  # 爆発エフェクトを追加
             score.value += 10  # スコアを加算（敵機の場合）
 
+class Shield(pg.sprite.Sprite):
+    """
+    防御壁に関するクラス
+    防御壁は常に自機の前方に設置され、触れた爆弾は削除される
+    引数 bird: 自機となるBirdクラスのインスタンス, life: 整数型のシールド持続時間
+    """
+    def __init__(self, bird: Bird, life: int):
+        super().__init__()
+        self.life = life    #防御壁残り時間
+        self.bird = bird    #追従すべき自機
+        self.image_origin = pg.Surface((20, self.bird.imgs[(+1, 0)].get_width() * 2))   #Surfaceを作成
+        pg.draw.rect(self.image_origin, (0, 0, 255), pg.Rect(0, 0, 20, self.bird.imgs[(+1, 0)].get_width() * 2))    #防御壁を描画
+        self.image = self.image_origin  #描画する画像
+        self.rect = self.image.get_rect()   #防御壁のrect
+
+    def update(self):
+        vx, vy = self.bird.dire #自機の向き
+        angle = math.degrees(math.atan2(-vy, vx))   #自機の向きから防御壁の角度を計算
+        self.image = pg.transform.rotozoom(self.image_origin, angle, 1.0)   #防御壁の角度を変更
+        self.rect = self.image.get_rect()   #rectを更新
+        #画像の描画位置を更新
+        if angle % 90 != 0:
+            self.rect.center = (self.bird.rect.centerx + self.bird.rect.width * vx / math.sqrt(2), self.bird.rect.centery + self.bird.rect.height * vy / math.sqrt(2))
+        else:
+            self.rect.center = (self.bird.rect.centerx + self.bird.rect.width * vx, self.bird.rect.centery + self.bird.rect.height * vy)
+        self.image.set_colorkey((0, 0, 0))  #画像を透過
+        self.life -= 1  #持続時間を減少
+        #持続時間が切れたら防御壁を削除
+        if self.life <= 0:
+            self.kill()
 
 
 def main():
@@ -370,6 +400,7 @@ def main():
     emys = pg.sprite.Group()
     emps = pg.sprite.Group()  # EMPのグループ
     gravities = pg.sprite.Group()
+    shields = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -392,12 +423,17 @@ def main():
                     beams.add(*neo_beam.gen_beams())  # ビームを生成し追加
                 else:
                     beams.add(Beam(bird))
-            if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and score.value >= -200:
+            if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and score.value >= 200:
                 gravities.add(Gravity(400))
                 score.value -= 200
             if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT:
                 print(score)
                 bird.activate_hyper(score)
+                beams.add(Beam(bird))
+            #capslockが押された場合かつスコアが50以上の場合かつシールドが存在しない場合に実行
+            if event.type == pg.KEYDOWN and event.key == pg.K_CAPSLOCK and score.value >= 50 and len(shields) <= 0:
+                score.value -= 50   #スコアを50消費
+                shields.add(Shield(bird, 400))  #シールドインスタンスを生成
         screen.blit(bg_img, [0, 0])
 
         if tmr % 200 == 0:
@@ -416,12 +452,8 @@ def main():
             exps.add(Explosion(bomb, 50))
             score.value += 1
 
-        if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
-            bird.change_img(8, screen)
-            score.update(screen)
-            pg.display.update()
-            time.sleep(2)
-            return
+        pg.sprite.groupcollide(shields, bombs, False, True) #シールドに接触した爆弾を削除
+
         if bird.state == "normal":
             if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
                 bird.change_img(8, screen) # こうかとん悲しみエフェクト
@@ -449,6 +481,8 @@ def main():
         gravities.update(bombs,emys,score,exps)
         gravities.draw(screen)
         score.update(screen)
+        shields.update()    #シールドの情報を更新
+        shields.draw(screen)    #シールドを描画
         pg.display.update()
         tmr += 1
         clock.tick(50)
