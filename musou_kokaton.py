@@ -284,6 +284,53 @@ class Score:
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         screen.blit(self.image, self.rect)
 
+class EMP(pg.sprite.Sprite):
+    """
+    電磁パルス（EMP）に関するクラス
+    発動時、敵機の爆弾投下を無効化し、爆弾の動きを鈍化させる
+    """
+    def __init__(self, emys: pg.sprite.Group, bombs: pg.sprite.Group, screen: pg.Surface):
+        """
+        EMPを発動する
+        引数1 emys：敵機のグループ
+        引数2 bombs：爆弾のグループ
+        引数3 screen：画面Surface
+        """
+        super().__init__()
+        self.emys = emys
+        self.bombs = bombs
+
+        # EMPエフェクトとしての画像 (画面全体に表示する半透明の黄色い矩形)
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        self.image.set_alpha(128)  # 半透明
+        self.image.fill((255, 255, 0))  # 黄色い矩形
+
+        self.rect = self.image.get_rect()  # 矩形の範囲を画面全体に設定
+
+        self.duration = 3  # EMP効果の持続フレーム数
+
+        # 敵機と爆弾を無効化
+        for emy in self.emys:
+            emy.interval = float('inf')  # 爆弾投下を無効化
+
+            
+            # ラプラシアンフィルタを適用
+            emy.image = pg.transform.laplacian(emy.image)  
+
+            # ラプラシアンフィルタ適用後、再度透過色を設定
+            emy.image.set_colorkey((0, 0, 0))  # 黒を再度透過色に設定
+
+        for bomb in self.bombs:
+            bomb.speed /= 2  # 爆弾の速度を半減
+
+    def update(self):
+        """
+        EMPの効果を画面に表示し、一定時間後に効果を終了する
+        """
+        if self.duration > 0:
+            self.duration -= 1
+        else:
+            self.kill()  # 効果終了
 class Gravity(pg.sprite.Sprite):
     """
     重力に関するクラス
@@ -321,6 +368,7 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    emps = pg.sprite.Group()  # EMPのグループ
     gravities = pg.sprite.Group()
 
     tmr = 0
@@ -330,6 +378,14 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_SPACE:
+                    beams.add(Beam(bird))
+                if event.key == pg.K_e and score.value >= 20:
+                    # スコアが20以上で「e」キーが押された場合、EMP発動
+                    emps.add(EMP(emys, bombs, screen))
+                    score.value -= 20  # スコアを20減らす
+
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 if key_lst[pg.K_LSHIFT]:  # 左Shiftキーが押下されているか
                     neo_beam = NeoBeam(bird, 5)  # ビーム数を5に設定
@@ -344,23 +400,28 @@ def main():
                 bird.activate_hyper(score)
         screen.blit(bg_img, [0, 0])
 
-        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+        if tmr % 200 == 0:
             emys.add(Enemy())
 
         for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+            if emy.state == "stop" and tmr % emy.interval == 0:
                 bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
-            exps.add(Explosion(emy, 100))  # 爆発エフェクト
-            score.value += 10  # 10点アップ
-            bird.change_img(6, screen)  # こうかとん喜びエフェクト
+            exps.add(Explosion(emy, 100))
+            score.value += 10
+            bird.change_img(6, screen)
 
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():
-            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-            score.value += 1  # 1点アップ
+            exps.add(Explosion(bomb, 50))
+            score.value += 1
 
+        if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
+            bird.change_img(8, screen)
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
         if bird.state == "normal":
             if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
                 bird.change_img(8, screen) # こうかとん悲しみエフェクト
@@ -383,6 +444,8 @@ def main():
         bombs.draw(screen)
         exps.update()
         exps.draw(screen)
+        emps.update()  # EMPの更新
+        emps.draw(screen)  # EMPの描画
         gravities.update(bombs,emys,score,exps)
         gravities.draw(screen)
         score.update(screen)
