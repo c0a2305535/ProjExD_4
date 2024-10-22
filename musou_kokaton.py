@@ -240,10 +240,12 @@ class Score:
     def update(self, screen: pg.Surface):
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         screen.blit(self.image, self.rect)
-""""""
+
 class Shield(pg.sprite.Sprite):
     """
     防御壁に関するクラス
+    防御壁は常に自機の前方に設置され、触れた爆弾は削除される
+    引数 bird: 自機となるBirdクラスのインスタンス, life: 整数型のシールド持続時間
     """
     def __init__(self, bird: Bird, life: int):
         super().__init__()
