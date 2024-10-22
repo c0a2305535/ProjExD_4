@@ -240,6 +240,33 @@ class Score:
     def update(self, screen: pg.Surface):
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         screen.blit(self.image, self.rect)
+""""""
+class Shield(pg.sprite.Sprite):
+    """
+    防御壁に関するクラス
+    """
+    def __init__(self, bird: Bird, life: int):
+        super().__init__()
+        self.life = life
+        self.bird = bird
+        self.image_origin = pg.Surface((20, self.bird.imgs[(+1, 0)].get_width() * 2))
+        pg.draw.rect(self.image_origin, (0, 0, 255), pg.Rect(0, 0, 20, self.bird.imgs[(+1, 0)].get_width() * 2))
+        self.image = self.image_origin
+        self.rect = self.image.get_rect()
+
+    def update(self):
+        vx, vy = self.bird.dire
+        angle = math.degrees(math.atan2(-vy, vx))
+        self.image = pg.transform.rotozoom(self.image_origin, angle, 1.0)
+        self.rect = self.image.get_rect()
+        if angle % 90 != 0:
+            self.rect.center = (self.bird.rect.centerx + self.bird.rect.width * vx / math.sqrt(2), self.bird.rect.centery + self.bird.rect.height * vy / math.sqrt(2))
+        else:
+            self.rect.center = (self.bird.rect.centerx + self.bird.rect.width * vx, self.bird.rect.centery + self.bird.rect.height * vy)
+        self.image.set_colorkey((0, 0, 0))
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
 
 
 def main():
@@ -253,6 +280,7 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    shields = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -263,6 +291,9 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+            if event.type == pg.KEYDOWN and event.key == pg.K_CAPSLOCK and score.value >= 50 and len(shields) <= 0:
+                score.value -= 50
+                shields.add(Shield(bird, 400))
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -282,6 +313,9 @@ def main():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
 
+        if pg.sprite.groupcollide(shields, bombs, False, True).keys():
+            pass
+
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
             bird.change_img(8, screen) # こうかとん悲しみエフェクト
             score.update(screen)
@@ -299,6 +333,8 @@ def main():
         exps.update()
         exps.draw(screen)
         score.update(screen)
+        shields.update()
+        shields.draw(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
