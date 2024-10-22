@@ -173,24 +173,19 @@ class Bomb(pg.sprite.Sprite):
 
 
 class Beam(pg.sprite.Sprite):
-    """
-    ビームに関するクラス
-    """
-    def __init__(self, bird: Bird):
-        """
-        ビーム画像Surfaceを生成する
-        引数 bird：ビームを放つこうかとん
-        """
+    def __init__(self, bird: Bird, angle: float = 0):
         super().__init__()
         self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        angle += math.degrees(math.atan2(-self.vy, self.vx))
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 2.0)
         self.vx = math.cos(math.radians(angle))
         self.vy = -math.sin(math.radians(angle))
         self.rect = self.image.get_rect()
-        self.rect.centery = bird.rect.centery+bird.rect.height*self.vy
-        self.rect.centerx = bird.rect.centerx+bird.rect.width*self.vx
+        self.rect.centery = bird.rect.centery + bird.rect.height * self.vy
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx
         self.speed = 10
+
+
 
     def update(self):
         """
@@ -200,6 +195,19 @@ class Beam(pg.sprite.Sprite):
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
         if check_bound(self.rect) != (True, True):
             self.kill()
+class NeoBeam:
+    def __init__(self, bird: Bird, num: int):
+        self.bird = bird
+        self.num = num
+
+    def gen_beams(self) -> list[Beam]:
+        beams = []
+        step = 100 / (self.num - 1) if self.num > 1 else 0  # ステップを計算
+        angles = range(-50, 51, int(step))  # ビームの角度を生成
+        for angle in angles:
+            beams.append(Beam(self.bird, angle))  # Beamインスタンスを生成
+        return beams
+
 
 
 class Explosion(pg.sprite.Sprite):
@@ -323,7 +331,11 @@ def main():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
+                if key_lst[pg.K_LSHIFT]:  # 左Shiftキーが押下されているか
+                    neo_beam = NeoBeam(bird, 5)  # ビーム数を5に設定
+                    beams.add(*neo_beam.gen_beams())  # ビームを生成し追加
+                else:
+                    beams.add(Beam(bird))
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and score.value >= -200:
                 gravities.add(Gravity(400))
                 score.value -= 200
